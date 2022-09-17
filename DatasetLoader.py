@@ -108,7 +108,7 @@ class AugmentWAV(object):
 class train_dataset_loader(Dataset):
     def __init__(self, train_list, augment, musan_path, rir_path, max_frames, train_path, **kwargs):
 
-        self.augment_wav = AugmentWAV(musan_path=musan_path, rir_path=rir_path, max_frames = max_frames)
+        #self.augment_wav = AugmentWAV(musan_path=musan_path, rir_path=rir_path, max_frames = max_frames)
 
         self.train_list = train_list
         self.max_frames = max_frames;
@@ -120,8 +120,9 @@ class train_dataset_loader(Dataset):
         with open(train_list) as dataset_file:
             lines = dataset_file.readlines();
 
+        lines = lines[1:]
         # Make a dictionary of ID names and ID indices
-        dictkeys = list(set([x.split()[0] for x in lines]))
+        dictkeys = list(set([x.split(',')[0] for x in lines]))
         dictkeys.sort()
         dictkeys = { key : ii for ii, key in enumerate(dictkeys) }
 
@@ -130,10 +131,10 @@ class train_dataset_loader(Dataset):
         self.data_label = []
         
         for lidx, line in enumerate(lines):
-            data = line.strip().split();
+            data = line.strip().split(',');
 
             speaker_label = dictkeys[data[0]];
-            filename = os.path.join(train_path,data[1]);
+            filename = os.path.join(train_path,data[-1]);
             
             self.data_label.append(speaker_label)
             self.data_list.append(filename)
