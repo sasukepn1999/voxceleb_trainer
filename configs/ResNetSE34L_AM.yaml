@@ -2,8 +2,13 @@ model: ResNetSE34L
 log_input: True
 encoder_type: SAP
 trainfunc: amsoftmax
-save_path: exps/ResNetSE34L_AM
 nLcasses: 5994
+max_frames: 1000
+eval_frames: 0
 batch_size: 200
 scale: 30
 margin: 0.3
+augment: False
+save_path: /content/drive/MyDrive/VLSP2022/exps/ResNetSE34L_AM
+train_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/Dev_10s_data.csv
+train_path: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA
