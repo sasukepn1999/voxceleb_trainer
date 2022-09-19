@@ -90,7 +90,7 @@ class ModelTrainer(object):
         tstart = time.time()
 
         for data, data_label in loader:
-
+            #print(1)
             data = data.transpose(1, 0)
 
             self.__model__.zero_grad()
@@ -155,9 +155,10 @@ class ModelTrainer(object):
         public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-public-test'
         enrol_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
         for idx, line in enumerate(lines):
-          #data = line.strip().split(',')[-2:]
-          lines[idx][1] = os.path.join(public_path, lines[idx][1])
-          lines[idx][2] = os.path.join(enrol_path, lines[idx][2])
+          data = line.strip().split(',')
+          data[1] = os.path.join(public_path, data[1])
+          data[2] = os.path.join(enrol_path, data[2])
+          lines[idx] = ','.join(data)
         # HARD CODE -------------------------------------------------------- HARD CODE !!!!
 
         ## Get a list of unique file names
