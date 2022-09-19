@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy, sys, random
-import time, itertools, importlib
+import time, itertools, importlib, os
 
 from DatasetLoader import test_dataset_loader
 from torch.cuda.amp import autocast, GradScaler
@@ -151,13 +151,23 @@ class ModelTrainer(object):
         with open(test_list) as f:
             lines = f.readlines()
 
+        # HARD CODE -------------------------------------------------------- HARD CODE !!!!
+        public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-public-test'
+        enrol_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
+        for idx, line in enumerate(lines):
+          #data = line.strip().split(',')[-2:]
+          lines[idx][1] = os.path.join(public_path, lines[idx][1])
+          lines[idx][2] = os.path.join(enrol_path, lines[idx][2])
+        # HARD CODE -------------------------------------------------------- HARD CODE !!!!
+
         ## Get a list of unique file names
-        files = list(itertools.chain(*[x.strip().split()[-2:] for x in lines]))
+        files = list(itertools.chain(*[x.strip().split(',')[-2:] for x in lines]))
         setfiles = list(set(files))
         setfiles.sort()
 
         ## Define test data loader
-        test_dataset = test_dataset_loader(setfiles, test_path, num_eval=num_eval, **kwargs)
+        test_path_ = '' # HARD CODE !!!!
+        test_dataset = test_dataset_loader(setfiles, test_path_, num_eval=num_eval, **kwargs)
 
         if distributed:
             sampler = torch.utils.data.distributed.DistributedSampler(test_dataset, shuffle=False)
