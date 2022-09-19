@@ -213,7 +213,7 @@ class ModelTrainer(object):
             ## Read files and compute all scores
             for idx, line in enumerate(lines):
 
-                data = line.split()
+                data = line.split(',')
 
                 ## Append random label if missing
                 if len(data) == 2:
