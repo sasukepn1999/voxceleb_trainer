@@ -34,7 +34,7 @@ parser.add_argument('--augment',        type=bool,  default=False,  help='Augmen
 parser.add_argument('--seed',           type=int,   default=10,     help='Seed for the random number generator')
 
 ## Training details
-parser.add_argument('--test_interval',  type=int,   default=10,     help='Test and save every [test_interval] epochs')
+parser.add_argument('--test_interval',  type=int,   default=5,     help='Test and save every [test_interval] epochs')
 parser.add_argument('--max_epoch',      type=int,   default=500,    help='Maximum number of epochs')
 parser.add_argument('--trainfunc',      type=str,   default="",     help='Loss function')
 
@@ -219,28 +219,28 @@ def main_worker(gpu, ngpus_per_node, args):
             print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)))
             scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)))
 
-        # if it % args.test_interval == 0:
+        if it % args.test_interval == 0:
 
-        #     sc, lab, _ = trainer.evaluateFromList(**vars(args))
+            sc, lab, _ = trainer.evaluateFromList(**vars(args))
 
-        #     if args.gpu == 0:
+            if args.gpu == 0:
                 
-        #         result = tuneThresholdfromScore(sc, lab, [1, 0.1])
+                result = tuneThresholdfromScore(sc, lab, [1, 0.1])
 
-        #         fnrs, fprs, thresholds = ComputeErrorRates(sc, lab)
-        #         mindcf, threshold = ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
+                fnrs, fprs, thresholds = ComputeErrorRates(sc, lab)
+                mindcf, threshold = ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
 
-        #         eers.append(result[1])
+                eers.append(result[1])
 
-        #         print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}".format(it, result[1], mindcf))
-        #         scorefile.write("Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}\n".format(it, result[1], mindcf))
+                print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}".format(it, result[1], mindcf))
+                scorefile.write("Epoch {:d}, VEER {:2.4f}, MinDCF {:2.5f}\n".format(it, result[1], mindcf))
 
-        #         trainer.saveParameters(args.model_save_path+"/model%09d.model"%it)
+                trainer.saveParameters(args.model_save_path+"/model%09d.model"%it)
 
-        #         with open(args.model_save_path+"/model%09d.eer"%it, 'w') as eerfile:
-        #             eerfile.write('{:2.4f}'.format(result[1]))
+                with open(args.model_save_path+"/model%09d.eer"%it, 'w') as eerfile:
+                    eerfile.write('{:2.4f}'.format(result[1]))
 
-        #         scorefile.flush()
+                scorefile.flush()
 
     if args.gpu == 0:
         scorefile.close()
