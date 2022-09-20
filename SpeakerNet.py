@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import torch
+from torch.functional import _return_counts
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy, sys, random
@@ -133,7 +134,7 @@ class ModelTrainer(object):
     ## Evaluate from list
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
-    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=10, **kwargs):
+    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=1, **kwargs):
 
         if distributed:
             rank = torch.distributed.get_rank()
@@ -152,6 +153,7 @@ class ModelTrainer(object):
             lines = f.readlines()
 
         # HARD CODE -------------------------------------------------------- HARD CODE !!!!
+        #lines = lines[:100]
         public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-public-test'
         enrol_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
         for idx, line in enumerate(lines):
@@ -159,10 +161,11 @@ class ModelTrainer(object):
           data[1] = os.path.join(public_path, data[1])
           data[2] = os.path.join(enrol_path, data[2])
           lines[idx] = ','.join(data)
+          
         # HARD CODE -------------------------------------------------------- HARD CODE !!!!
 
         ## Get a list of unique file names
-        files = list(itertools.chain(*[x.strip().split(',')[-2:] for x in lines]))
+        files = list(itertools.chain(*[x.strip().split(',')[-3:-1] for x in lines]))
         setfiles = list(set(files))
         setfiles.sort()
 
@@ -182,6 +185,7 @@ class ModelTrainer(object):
             inp1 = data[0][0].cuda()
             with torch.no_grad():
                 ref_feat = self.__model__(inp1).detach().cpu()
+    
             feats[data[1][0]] = ref_feat
             telapsed = time.time() - tstart
 
@@ -231,14 +235,14 @@ class ModelTrainer(object):
                 score = -1 * numpy.mean(dist)
 
                 all_scores.append(score)
-                all_labels.append(int(data[0]))
+                all_labels.append(int(data[-1]))
                 all_trials.append(data[1] + " " + data[2])
 
                 if idx % print_interval == 0:
                     telapsed = time.time() - tstart
                     sys.stdout.write("\rComputing {:d} of {:d}: {:.2f} Hz".format(idx, len(lines), idx / telapsed))
                     sys.stdout.flush()
-
+        
         return (all_scores, all_labels, all_trials)
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
