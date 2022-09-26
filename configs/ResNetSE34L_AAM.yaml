@@ -3,9 +3,8 @@ log_input: True
 encoder_type: SAP
 trainfunc: aamsoftmax
 nOut: 256
-nLcasses: 5994
 batch_size: 32
-scale: 30
+scale: 15
 margin: 0.3
 max_frames: 1000
 eval_frames: 0
