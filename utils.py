@@ -3,6 +3,22 @@
 
 import torch
 import torch.nn.functional as F
+from torch.autograd import Function
+
+
+class ReverseLayerF(Function):
+
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        output = grad_output.neg() * ctx.alpha
+
+        return output, None
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""

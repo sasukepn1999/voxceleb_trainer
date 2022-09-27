@@ -2,6 +2,8 @@ model: ResNetSE34L
 log_input: True
 encoder_type: SAP
 trainfunc: aamsoftmax
+trainfunc_dev: softmax
+multi_task: True
 nOut: 256
 batch_size: 32
 scale: 15
@@ -9,7 +11,7 @@ margin: 0.3
 max_frames: 1000
 eval_frames: 0
 augment: False
-save_path: /content/drive/MyDrive/VLSP2022/exps/ResNetSE34L_AAM
+save_path: /content/drive/MyDrive/VLSP2022/exps/ResNetSE34L_AAM_Multi-task
 train_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/Dev_10s_data.csv
 train_path: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA
 test_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/eval_sessionB.csv

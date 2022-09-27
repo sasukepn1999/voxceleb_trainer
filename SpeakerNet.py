@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+from audioop import reverse
 import torch
 from torch.functional import _return_counts
 import torch.nn as nn
@@ -11,6 +12,8 @@ import time, itertools, importlib, os
 from DatasetLoader import test_dataset_loader
 from torch.cuda.amp import autocast, GradScaler
 
+from utils import ReverseLayerF
+
 
 class WrappedModel(nn.Module):
 
@@ -20,12 +23,12 @@ class WrappedModel(nn.Module):
         super(WrappedModel, self).__init__()
         self.module = model
 
-    def forward(self, x, label=None):
-        return self.module(x, label)
+    def forward(self, x, label=None, label_dev=None, alpha=1.0):
+        return self.module(x, label, label_dev, alpha)
 
 
 class SpeakerNet(nn.Module):
-    def __init__(self, model, optimizer, trainfunc, nPerSpeaker, **kwargs):
+    def __init__(self, model, optimizer, trainfunc, trainfunc_dev, nPerSpeaker, **kwargs):
         super(SpeakerNet, self).__init__()
 
         SpeakerNetModel = importlib.import_module("models." + model).__getattribute__("MainModel")
@@ -34,9 +37,12 @@ class SpeakerNet(nn.Module):
         LossFunction = importlib.import_module("loss." + trainfunc).__getattribute__("LossFunction")
         self.__L__ = LossFunction(**kwargs)
 
+        LossFunction = importlib.import_module("loss." + trainfunc_dev).__getattribute__("LossFunction")
+        self.__Ldev__ = LossFunction(nOut=256, nClasses=4)#, **kwargs)
+
         self.nPerSpeaker = nPerSpeaker
 
-    def forward(self, data, label=None):
+    def forward(self, data, label, label_dev=None, alpha=1.0):
 
         data = data.reshape(-1, data.size()[-1]).cuda()
         outp = self.__S__.forward(data)
@@ -47,11 +53,16 @@ class SpeakerNet(nn.Module):
         else:
 
             outp = outp.reshape(self.nPerSpeaker, -1, outp.size()[-1]).transpose(1, 0).squeeze(1)
-
             nloss, prec1 = self.__L__.forward(outp, label)
+            
+            if label_dev == None:
+                return nloss, prec1
+            else:
+                reverse_feature = ReverseLayerF.apply(outp, alpha)
+                reverse_nloss, reverse_prec1 = self.__Ldev__.forward(reverse_feature, label_dev)
+                nloss = nloss + reverse_nloss
 
-            return nloss, prec1
-
+                return nloss, prec1, reverse_prec1
 
 class ModelTrainer(object):
     def __init__(self, speaker_model, optimizer, scheduler, gpu, mixedprec, **kwargs):
@@ -76,7 +87,7 @@ class ModelTrainer(object):
     # ## Train network
     # ## ===== ===== ===== ===== ===== ===== ===== =====
 
-    def train_network(self, loader, verbose):
+    def train_network(self, loader, epoch, n_epoch, verbose, multi_task=False):
 
         self.__model__.train()
 
@@ -90,45 +101,92 @@ class ModelTrainer(object):
 
         tstart = time.time()
 
-        for data, data_label in loader:
-            #print(1)
-            data = data.transpose(1, 0)
+        if multi_task:
+            top1_dev = 0
+            for data, data_label, data_label_dev in loader:
+                #print(data_label_dev)
+                data = data.transpose(1, 0)
 
-            self.__model__.zero_grad()
+                self.__model__.zero_grad()
 
-            label = torch.LongTensor(data_label).cuda()
+                label = torch.LongTensor(data_label).cuda()
+                label_dev = torch.LongTensor(data_label_dev).cuda()
 
-            if self.mixedprec:
-                with autocast():
-                    nloss, prec1 = self.__model__(data, label)
-                self.scaler.scale(nloss).backward()
-                self.scaler.step(self.__optimizer__)
-                self.scaler.update()
-            else:
-                nloss, prec1 = self.__model__(data, label)
-                nloss.backward()
-                self.__optimizer__.step()
+                p = float(counter + epoch * len(loader)) / n_epoch / len(loader)
+                alpha = 2. / (1. + numpy.exp(-10 * p)) - 1
 
-            loss += nloss.detach().cpu().item()
-            top1 += prec1.detach().cpu().item()
-            counter += 1
-            index += stepsize
+                if self.mixedprec:
+                    with autocast():
+                        nloss, prec1, reverse_prec1 = self.__model__(data, label, label_dev, alpha)
+                    self.scaler.scale(nloss).backward()
+                    self.scaler.step(self.__optimizer__)
+                    self.scaler.update()
+                else:
+                    nloss, prec1, reverse_prec1 = self.__model__(data, label, label_dev, alpha)
+                    nloss.backward()
+                    self.__optimizer__.step()
 
-            telapsed = time.time() - tstart
-            tstart = time.time()
+                loss += nloss.detach().cpu().item()
+                top1 += prec1.detach().cpu().item()
+                top1_dev += reverse_prec1.detach().cpu().item()
+                counter += 1
+                index += stepsize
 
-            if verbose:
-                sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__() * loader.batch_size))
-                sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% - {:.2f} Hz ".format(loss / counter, top1 / counter, stepsize / telapsed))
-                sys.stdout.flush()
+                telapsed = time.time() - tstart
+                tstart = time.time()
 
-            if self.lr_step == "iteration":
+                if verbose:
+                    sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__() * loader.batch_size))
+                    sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% TEER/TAcc_dev {:2.3f}% - {:.2f} Hz ".format(loss / counter, top1 / counter, top1_dev / counter, stepsize / telapsed))
+                    sys.stdout.flush()
+
+                if self.lr_step == "iteration":
+                    self.__scheduler__.step()
+
+            if self.lr_step == "epoch":
                 self.__scheduler__.step()
 
-        if self.lr_step == "epoch":
-            self.__scheduler__.step()
+            return (loss / counter, top1 / counter, top1_dev / counter)
+        else:
+            for data, data_label in loader:
+                #print(1)
+                data = data.transpose(1, 0)
 
-        return (loss / counter, top1 / counter)
+                self.__model__.zero_grad()
+
+                label = torch.LongTensor(data_label).cuda()
+
+                if self.mixedprec:
+                    with autocast():
+                        nloss, prec1 = self.__model__(data, label)
+                    self.scaler.scale(nloss).backward()
+                    self.scaler.step(self.__optimizer__)
+                    self.scaler.update()
+                else:
+                    nloss, prec1 = self.__model__(data, label)
+                    nloss.backward()
+                    self.__optimizer__.step()
+
+                loss += nloss.detach().cpu().item()
+                top1 += prec1.detach().cpu().item()
+                counter += 1
+                index += stepsize
+
+                telapsed = time.time() - tstart
+                tstart = time.time()
+
+                if verbose:
+                    sys.stdout.write("\rProcessing {:d} of {:d}:".format(index, loader.__len__() * loader.batch_size))
+                    sys.stdout.write("Loss {:f} TEER/TAcc {:2.3f}% - {:.2f} Hz ".format(loss / counter, top1 / counter, stepsize / telapsed))
+                    sys.stdout.flush()
+
+                if self.lr_step == "iteration":
+                    self.__scheduler__.step()
+
+            if self.lr_step == "epoch":
+                self.__scheduler__.step()
+
+            return (loss / counter, top1 / counter)
 
     ## ===== ===== ===== ===== ===== ===== ===== =====
     ## Evaluate from list

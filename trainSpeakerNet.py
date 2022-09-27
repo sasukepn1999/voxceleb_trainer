@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 
+from ast import arg
 import sys, time, os, argparse
 import yaml
 import numpy
@@ -34,9 +35,10 @@ parser.add_argument('--augment',        type=bool,  default=False,  help='Augmen
 parser.add_argument('--seed',           type=int,   default=10,     help='Seed for the random number generator')
 
 ## Training details
-parser.add_argument('--test_interval',  type=int,   default=5,     help='Test and save every [test_interval] epochs')
+parser.add_argument('--test_interval',  type=int,   default=5,      help='Test and save every [test_interval] epochs')
 parser.add_argument('--max_epoch',      type=int,   default=500,    help='Maximum number of epochs')
 parser.add_argument('--trainfunc',      type=str,   default="",     help='Loss function')
+parser.add_argument('--trainfunc_dev',  type=str,   default="",     help='Loss function domain adaptation')
 
 ## Optimizer
 parser.add_argument('--optimizer',      type=str,   default="adam", help='sgd or adam')
@@ -76,7 +78,8 @@ parser.add_argument('--log_input',      type=bool,  default=False,  help='Log in
 parser.add_argument('--model',          type=str,   default="",     help='Name of model definition')
 parser.add_argument('--encoder_type',   type=str,   default="SAP",  help='Type of encoder')
 parser.add_argument('--nOut',           type=int,   default=512,    help='Embedding size in the last FC layer')
-parser.add_argument('--sinc_stride',    type=int,   default=10,    help='Stride size of the first analytic filterbank layer of RawNet3')
+parser.add_argument('--sinc_stride',    type=int,   default=10,     help='Stride size of the first analytic filterbank layer of RawNet3')
+parser.add_argument('--multi_task',     type=bool,  default=False,  help='Domain adaptation')
 
 ## For test only
 parser.add_argument('--eval',           dest='eval', action='store_true', help='Eval only')
@@ -212,12 +215,19 @@ def main_worker(gpu, ngpus_per_node, args):
         train_sampler.set_epoch(it)
 
         clr = [x['lr'] for x in trainer.__optimizer__.param_groups]
+        
+        if args.multi_task:
+            loss, traineer, traineer_dev = trainer.train_network(train_loader, it, args.max_epoch, multi_task=True, verbose=(args.gpu == 0))
 
-        loss, traineer = trainer.train_network(train_loader, verbose=(args.gpu == 0))
+            if args.gpu == 0:
+                print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TEER/TAcc_dev {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, traineer_dev, loss, max(clr)))
+                scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f},  TEER/TAcc_dev {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, traineer_dev, loss, max(clr)))
+        else:
+            loss, traineer = trainer.train_network(train_loader, it, args.max_epoch, verbose=(args.gpu == 0))
 
-        if args.gpu == 0:
-            print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)))
-            scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)))
+            if args.gpu == 0:
+                print('\n',time.strftime("%Y-%m-%d %H:%M:%S"), "Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f}".format(it, traineer, loss, max(clr)))
+                scorefile.write("Epoch {:d}, TEER/TAcc {:2.2f}, TLOSS {:f}, LR {:f} \n".format(it, traineer, loss, max(clr)))
 
         if it % args.test_interval == 0:
 

@@ -126,17 +126,24 @@ class train_dataset_loader(Dataset):
         dictkeys.sort()
         dictkeys = { key : ii for ii, key in enumerate(dictkeys) }
 
+        dictkeys_dev = list(set([x.split(',')[1].split('_')[1][1] for x in lines]))
+        dictkeys_dev.sort()
+        dictkeys_dev = { key : ii for ii, key in enumerate(dictkeys_dev) }
+
         # Parse the training list into file names and ID indices
-        self.data_list  = []
-        self.data_label = []
+        self.data_list      = []
+        self.data_label     = []
+        self.data_label_dev = []
         
         for lidx, line in enumerate(lines):
             data = line.strip().split(',');
 
             speaker_label = dictkeys[data[0]];
+            dev_label = dictkeys_dev[data[1].split('_')[1][1]];
             filename = os.path.join(train_path,data[-1]);
             
             self.data_label.append(speaker_label)
+            self.data_label_dev.append(dev_label)
             self.data_list.append(filename)
 
     def __getitem__(self, indices):
@@ -162,7 +169,7 @@ class train_dataset_loader(Dataset):
 
         feat = numpy.concatenate(feat, axis=0)
 
-        return torch.FloatTensor(feat), self.data_label[index]
+        return torch.FloatTensor(feat), self.data_label[index], self.data_label_dev[index]
 
     def __len__(self):
         return len(self.data_list)
