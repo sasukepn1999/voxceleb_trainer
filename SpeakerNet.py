@@ -148,7 +148,7 @@ class ModelTrainer(object):
 
             return (loss / counter, top1 / counter, top1_dev / counter)
         else:
-            for data, data_label in loader:
+            for data, data_label, _ in loader:
                 #print(1)
                 data = data.transpose(1, 0)
 
