@@ -9,10 +9,14 @@ import torch.nn.functional as F
 import numpy, sys, random
 import time, itertools, importlib, os
 
-from DatasetLoader import test_dataset_loader
+from pathlib import Path
+
+from tqdm import tqdm
+
+from DatasetLoader import test_dataset_loader, loadWAV
 from torch.cuda.amp import autocast, GradScaler
 
-from utils import ReverseLayerF
+from utils import ReverseLayerF,  score_normalization
 
 
 class WrappedModel(nn.Module):
@@ -192,7 +196,7 @@ class ModelTrainer(object):
     ## Evaluate from list
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
-    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=1, **kwargs):
+    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=1, cohorts_path=None, **kwargs):
 
         if distributed:
             rank = torch.distributed.get_rank()
@@ -205,6 +209,12 @@ class ModelTrainer(object):
         files = []
         feats = {}
         tstart = time.time()
+
+        # Cohorts
+        if cohorts_path is None:
+            cohorts = None
+        else:
+            cohorts = numpy.load(cohorts_path)
 
         ## Read all lines
         with open(test_list) as f:
@@ -288,9 +298,20 @@ class ModelTrainer(object):
                     ref_feat = F.normalize(ref_feat, p=2, dim=1)
                     com_feat = F.normalize(com_feat, p=2, dim=1)
 
-                dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
-
-                score = -1 * numpy.mean(dist)
+                # NOTE: distance for training, normalized score for evaluating and testing
+                if cohorts_path is None:
+                    # dist = F.pairwise_distance(
+                    # ref_feat.unsqueeze(-1),
+                    # com_feat.unsqueeze(-1).transpose(
+                    #     0, 2)).detach().cpu().numpy()
+                    # score = -1 * numpy.mean(dist)
+                    dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
+                    score = -1 * numpy.mean(dist)
+                else:
+                    score = score_normalization(ref_feat,
+                                                com_feat,
+                                                cohorts,
+                                                top=100)
 
                 all_scores.append(score)
                 all_labels.append(int(data[-1]))
@@ -344,3 +365,114 @@ class ModelTrainer(object):
                 continue
 
             self_state[name].copy_(param)
+
+    ## ===== ===== ===== ===== ===== ===== ===== =====
+    ## Prepare cohorts
+    ## ===== ===== ===== ===== ===== ===== ===== =====
+
+    def prepare(self,
+                from_path='../data/test',
+                save_path='checkpoints',
+                prepare_type='cohorts',
+                num_eval=1,
+                eval_frames=0,
+                print_interval=1):
+        """
+        Prepared 1 of the 2:
+        1. Mean L2-normalized embeddings for known speakers.
+        2. Cohorts for score normalization.
+        """
+        # HARD CODE -------------------------------------------------------- HARD CODE !!!!
+        org_root_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
+        # HARD CODE -------------------------------------------------------- HARD CODE !!!!
+
+        tstart = time.time()
+        self.__model__.eval()
+        if prepare_type == 'cohorts':
+            # Prepare cohorts for score normalization.
+            feats = []
+            read_file = from_path
+            files = []
+            used_speakers = []
+            with open(read_file) as listfile:
+                lines = listfile.readlines()
+                # Skip header.
+                lines = lines[1:]
+                for line in lines:
+                    data = line.strip().split(',')
+                    data_class = data[0]
+                    utterance_path = data[2]
+                    if data_class not in used_speakers:
+                        used_speakers.append(data_class)
+                        files.append(os.path.join(org_root_path, utterance_path))
+                # while True:
+                #     line = listfile.readline()
+                #     if (not line):
+                #         break
+                #     data = line.split()
+
+                #     data_1_class = Path(data[1]).parent.stem
+                #     data_2_class = Path(data[2]).parent.stem
+                #     if data_1_class not in used_speakers:
+                #         used_speakers.append(data_1_class)
+                #         files.append(data[1])
+                #     if data_2_class not in used_speakers:
+                #         used_speakers.append(data_2_class)
+                #         files.append(data[2])
+            setfiles = list(set(files))
+            setfiles.sort()
+
+            # Save all features to file
+            for idx, f in enumerate(tqdm(setfiles)):
+                inp1 = torch.FloatTensor(
+                    loadWAV(f, eval_frames, evalmode=True,
+                            num_eval=num_eval)).cuda()
+
+                feat = self.__model__.module.__S__.forward(inp1)
+                if self.__model__.module.__L__.test_normalize:
+                    feat = F.normalize(feat, p=2,
+                                       dim=1).detach().cpu().numpy().squeeze()
+                else:
+                    feat = feat.detach().cpu().numpy().squeeze()
+                feats.append(feat)
+
+            filename = 'cohort.npy'
+            numpy.save(os.path.join(save_path, filename), numpy.array(feats))
+        elif prepare_type == 'embed':
+            # Prepare mean L2-normalized embeddings for known speakers.
+            speaker_dirs = [x for x in Path(from_path).iterdir() if x.is_dir()]
+            embeds = None
+            classes = {}
+            # Save mean features
+            for idx, speaker_dir in enumerate(speaker_dirs):
+                classes[idx] = speaker_dir.stem
+                files = list(speaker_dir.glob('*.wav'))
+                mean_embed = None
+                for f in files:
+                    embed = self.embed_utterance(
+                        f,
+                        eval_frames=eval_frames,
+                        num_eval=num_eval,
+                        normalize=self.__L__.test_normalize)
+                    if mean_embed is None:
+                        mean_embed = embed.unsqueeze(0)
+                    else:
+                        mean_embed = torch.cat(
+                            (mean_embed, embed.unsqueeze(0)), 0)
+                mean_embed = torch.mean(mean_embed, dim=0)
+                if embeds is None:
+                    embeds = mean_embed.unsqueeze(-1)
+                else:
+                    embeds = torch.cat((embeds, mean_embed.unsqueeze(-1)), -1)
+                telapsed = time.time() - tstart
+                if idx % print_interval == 0:
+                    sys.stdout.write(
+                        "\rReading %d of %d: %.4f s, embedding size %d" %
+                        (idx, len(speaker_dirs), telapsed / (idx + 1), embed.size()[1]))
+            print('')
+            print(embeds.shape)
+            # embeds = rearrange(embeds, 'n_class n_sam feat -> n_sam feat n_class')
+            torch.save(embeds, Path(save_path, 'embeds.pt'))
+            numpy.save(Path(save_path, 'classes.npy'), classes)
+        else:
+            raise NotImplementedError

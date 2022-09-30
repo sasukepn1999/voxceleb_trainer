@@ -5,6 +5,34 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Function
 
+import numpy as np
+
+
+def score_normalization(ref, com, cohorts, top=-1):
+    """
+    Adaptive symmetric score normalization using cohorts from eval data
+    """
+    def ZT_norm(ref, com, top=-1):
+        """
+        Perform Z-norm or T-norm depending on input order
+        """
+        S = np.mean(np.inner(cohorts, ref), axis=1)
+        S = np.sort(S, axis=0)[::-1][:top]
+        mean_S = np.mean(S)
+        std_S = np.std(S)
+        score = np.inner(ref, com)
+        score = np.mean(score)
+        return (score - mean_S) / std_S
+
+    def S_norm(ref, com, top=-1):
+        """
+        Perform S-norm
+        """
+        return (ZT_norm(ref, com, top=top) + ZT_norm(com, ref, top=top)) / 2
+
+    ref = ref.cpu().numpy()
+    com = com.cpu().numpy()
+    return S_norm(ref, com, top=top)
 
 class ReverseLayerF(Function):
 
