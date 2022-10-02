@@ -1,0 +1,17 @@
+model: RawNet3
+encoder_type: ECA
+nOut: 256
+sinc_stride: 10
+max_frames: 1000
+batch_size: 32
+trainfunc: softmax
+trainfunc_dev: softmax
+lr_decay: 0.75
+weight_decay: 5e-05
+max_seg_per_spk: 500
+eval_frames: 0
+augment: False
+save_path: /content/drive/MyDrive/VLSP2022/exps/RawNet3_SM
+train_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/Dev_Enr_10s_data.csv
+train_path: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA
+test_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/eval_sessionB.csv
