@@ -23,7 +23,7 @@ class ResNetSE(nn.Module):
         self.conv1 = nn.Conv2d(1, num_filters[0] , kernel_size=3, stride=1, padding=1)
         self.relu = nn.ReLU(inplace=True)
         self.bn1 = nn.BatchNorm2d(num_filters[0])
-        
+        self.bn_last = nn.BatchNorm1d(nOut)
 
         self.layer1 = self._make_layer(block, num_filters[0], layers[0])
         self.layer2 = self._make_layer(block, num_filters[1], layers[1], stride=(2, 2))
@@ -114,7 +114,8 @@ class ResNetSE(nn.Module):
 
         x = x.view(x.size()[0], -1)
         x = self.fc(x)
-
+        x = self.bn_last(x)
+        
         return x
 
 
