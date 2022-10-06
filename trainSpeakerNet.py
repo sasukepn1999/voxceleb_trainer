@@ -69,7 +69,7 @@ parser.add_argument('--train_list',     type=str,   default="data/train_list.txt
 parser.add_argument('--test_list',      type=str,   default="data/test_list.txt",   help='Evaluation list')
 parser.add_argument('--cohort_list',    type=str,   default="data/cohort_list.txt",   help='Cohort list')
 parser.add_argument('--train_path',     type=str,   default="data/voxceleb2", help='Absolute path to the train set')
-parser.add_argument('--cohorts_path',   type=str,   default=None, help='Absolute path to the cohort set')
+parser.add_argument('--cohort_path',    type=str,   default=None, help='Absolute path to the cohort set')
 parser.add_argument('--test_path',      type=str,   default="data/voxceleb1", help='Absolute path to the test set')
 parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set')
 parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set')
