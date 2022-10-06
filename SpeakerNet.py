@@ -196,7 +196,7 @@ class ModelTrainer(object):
     ## Evaluate from list
     ## ===== ===== ===== ===== ===== ===== ===== =====
 
-    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=1, cohorts_path=None, **kwargs):
+    def evaluateFromList(self, test_list, test_path, nDataLoaderThread, distributed, print_interval=100, num_eval=1, cohort_path=None, **kwargs):
 
         if distributed:
             rank = torch.distributed.get_rank()
@@ -211,10 +211,10 @@ class ModelTrainer(object):
         tstart = time.time()
 
         # Cohorts
-        if cohorts_path is None:
+        if cohort_path is None:
             cohorts = None
         else:
-            cohorts = numpy.load(cohorts_path)
+            cohorts = numpy.load(cohort_path)
 
         ## Read all lines
         with open(test_list) as f:
@@ -299,7 +299,7 @@ class ModelTrainer(object):
                     com_feat = F.normalize(com_feat, p=2, dim=1)
 
                 # NOTE: distance for training, normalized score for evaluating and testing
-                if cohorts_path is None:
+                if cohort_path is None:
                     # dist = F.pairwise_distance(
                     # ref_feat.unsqueeze(-1),
                     # com_feat.unsqueeze(-1).transpose(
