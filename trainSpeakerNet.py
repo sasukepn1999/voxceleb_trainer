@@ -198,6 +198,25 @@ def main_worker(gpu, ngpus_per_node, args):
         
         sc, lab, _ = trainer.evaluateFromList(**vars(args))
 
+        # Write submission and prepare for calibration.
+        with open(args.test_list, 'r') as f:
+            lines = f.readlines()
+        
+        with open(args.save_path + '/sys_llr.txt', 'w') as sysfile:
+            with open(args.save_path + '/trial-keys.txt', 'w') as trialfile:
+                for i, line in enumerate(lines):
+                    data = line.strip().split(',')
+                    test  = data[1]
+                    enrol = data[2]
+                    label = 'tgt' if data[3]=='1' else 'imp'
+
+                    sys_line   = ' '.join([enrol, test, str(sc[i])]) + '\n'
+                    trial_line = ' '.join([enrol, test, label]) + '\n'
+                    
+                    sysfile.write(sys_line)
+                    trialfile.write(trial_line)
+
+
         if args.gpu == 0:
 
             result = tuneThresholdfromScore(sc, lab, [1, 0.1])
