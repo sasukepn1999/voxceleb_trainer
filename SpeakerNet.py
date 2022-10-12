@@ -300,13 +300,13 @@ class ModelTrainer(object):
 
                 # NOTE: distance for training, normalized score for evaluating and testing
                 if cohort_path is None:
+                    score = torch.inner(ref_feat.reshape(-1), com_feat.reshape(-1)).detach().cpu().numpy()
                     # dist = F.pairwise_distance(
-                    # ref_feat.unsqueeze(-1),
-                    # com_feat.unsqueeze(-1).transpose(
-                    #     0, 2)).detach().cpu().numpy()
+                    # ref_feat.reshape(num_eval, -1),
+                    # com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
                     # score = -1 * numpy.mean(dist)
-                    dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
-                    score = -1 * numpy.mean(dist)
+                    # dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
+                    # score = -1 * numpy.mean(dist)
                 else:
                     score = score_normalization(ref_feat,
                                                 com_feat,
