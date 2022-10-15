@@ -314,7 +314,7 @@ class ModelTrainer(object):
                                                 top=100)
 
                 all_scores.append(score)
-                all_labels.append(1)
+                all_labels.append(str(data[-1]))
                 all_trials.append(data[1] + " " + data[2])
 
                 if idx % print_interval == 0:
