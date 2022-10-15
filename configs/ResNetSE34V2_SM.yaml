@@ -17,8 +17,8 @@ weight_decay: 0.00005
 lr: 0.001
 lr_decay: 0.95
 augment: False
-initial_model: /content/drive/MyDrive/VLSP2022/exps/ResNet34V2_pretrained/model/baseline_v2_smproto.model
+initial_model: /content/drive/MyDrive/VLSP2022/exps/ResNet34V2_pretrained_8s_softmaxproto/model/model000000210.model
 save_path: /content/drive/MyDrive/VLSP2022/exps/ResNet34V2_pretrained_8s_softmaxproto
 train_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/Dev_Enr_10s_data.csv
 train_path: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA
-test_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/eval_sessionB.csv
+test_list: /content/drive/MyDrive/VLSP2022/extracted_dataset/I-MSV-DATA/eval_sessionA.csv
