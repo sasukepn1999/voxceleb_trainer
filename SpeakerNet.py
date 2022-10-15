@@ -222,7 +222,7 @@ class ModelTrainer(object):
 
         # HARD CODE -------------------------------------------------------- HARD CODE !!!!
         #lines = lines[:100]
-        public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-public-test'
+        public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-private-test'
         enrol_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
         for idx, line in enumerate(lines):
           data = line.strip().split(',')
@@ -249,7 +249,7 @@ class ModelTrainer(object):
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=nDataLoaderThread, drop_last=False, sampler=sampler)
 
         ## Extract features for every image
-        for idx, data in enumerate(test_loader):
+        for idx, data in tqdm(enumerate(test_loader), total=len(test_loader)):
             inp1 = data[0][0].cuda()
             with torch.no_grad():
                 ref_feat = self.__model__(inp1).detach().cpu()
@@ -314,7 +314,7 @@ class ModelTrainer(object):
                                                 top=100)
 
                 all_scores.append(score)
-                all_labels.append(int(data[-1]))
+                all_labels.append(1)
                 all_trials.append(data[1] + " " + data[2])
 
                 if idx % print_interval == 0:
