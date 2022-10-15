@@ -202,8 +202,8 @@ def main_worker(gpu, ngpus_per_node, args):
         with open(args.test_list, 'r') as f:
             lines = f.readlines()
         
-        with open(args.save_path + '/sys_llr.txt', 'w') as sysfile:
-            with open(args.save_path + '/trial-keys.txt', 'w') as trialfile:
+        with open(args.save_path + '/sys_llr_private_A.txt', 'w') as sysfile:
+            with open(args.save_path + '/trial-keys_private_A.txt', 'w') as trialfile:
                 for i, line in enumerate(lines):
                     data = line.strip().split(',')
                     test  = data[1]
