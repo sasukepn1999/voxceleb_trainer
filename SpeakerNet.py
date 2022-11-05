@@ -222,7 +222,7 @@ class ModelTrainer(object):
 
         # HARD CODE -------------------------------------------------------- HARD CODE !!!!
         #lines = lines[:100]
-        public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-private-test'
+        public_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset/imsv-public-test'
         enrol_path = '/content/drive/MyDrive/VLSP2022/dataset/I-MSV-DATA'
         for idx, line in enumerate(lines):
           data = line.strip().split(',')
@@ -300,13 +300,13 @@ class ModelTrainer(object):
 
                 # NOTE: distance for training, normalized score for evaluating and testing
                 if cohort_path is None:
-                    score = torch.inner(ref_feat.reshape(-1), com_feat.reshape(-1)).detach().cpu().numpy()
+                    #score = torch.inner(ref_feat.reshape(-1), com_feat.reshape(-1)).detach().cpu().numpy()
                     # dist = F.pairwise_distance(
                     # ref_feat.reshape(num_eval, -1),
                     # com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
                     # score = -1 * numpy.mean(dist)
-                    # dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
-                    # score = -1 * numpy.mean(dist)
+                    dist = torch.cdist(ref_feat.reshape(num_eval, -1), com_feat.reshape(num_eval, -1)).detach().cpu().numpy()
+                    score = -1 * numpy.mean(dist)
                 else:
                     score = score_normalization(ref_feat,
                                                 com_feat,
@@ -314,7 +314,7 @@ class ModelTrainer(object):
                                                 top=100)
 
                 all_scores.append(score)
-                all_labels.append(str(data[-1]))
+                all_labels.append(int(data[-1]))
                 all_trials.append(data[1] + " " + data[2])
 
                 if idx % print_interval == 0:
@@ -476,3 +476,38 @@ class ModelTrainer(object):
             numpy.save(Path(save_path, 'classes.npy'), classes)
         else:
             raise NotImplementedError
+    
+    def get_embedding(self,
+                        filename='embeddings.npy',
+                        from_path='../data/test',
+                        save_path='checkpoints',
+                        num_eval=1,
+                        eval_frames=0):
+        org_root_path = '/content/drive/MyDrive/VLSP2022/extracted_dataset'
+        self.__model__.eval()
+
+        feats = []
+        read_file = from_path
+        files = []
+        with open(read_file) as listfile:
+            lines = listfile.readlines()
+            
+            for line in lines:
+                data = line.strip()
+                files.append(os.path.join(org_root_path, data))
+
+            # Save all features to file
+        for idx, f in enumerate(tqdm(files)):
+            inp1 = torch.FloatTensor(
+                loadWAV(f, eval_frames, evalmode=True,
+                        num_eval=num_eval)).cuda()
+
+            feat = self.__model__.module.__S__.forward(inp1)
+            if self.__model__.module.__L__.test_normalize:
+                feat = F.normalize(feat, p=2,
+                                    dim=1).detach().cpu().numpy().squeeze()
+            else:
+                feat = feat.detach().cpu().numpy().squeeze()
+            feats.append(feat)
+
+        numpy.save(os.path.join(save_path, filename), numpy.array(feats))
