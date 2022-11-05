@@ -73,6 +73,7 @@ parser.add_argument('--cohort_path',    type=str,   default=None, help='Absolute
 parser.add_argument('--test_path',      type=str,   default="data/voxceleb1", help='Absolute path to the test set')
 parser.add_argument('--musan_path',     type=str,   default="data/musan_split", help='Absolute path to the test set')
 parser.add_argument('--rir_path',       type=str,   default="data/RIRS_NOISES/simulated_rirs", help='Absolute path to the test set')
+parser.add_argument('--to_embed_path',   type=str,   default=None, help='Absolute path to the embedding set')
 
 ## Model definition
 parser.add_argument('--n_mels',         type=int,   default=40,     help='Number of mel filterbanks')
@@ -87,6 +88,8 @@ parser.add_argument('--multi_task',     type=bool,  default=False,  help='Domain
 parser.add_argument('--eval',           dest='eval', action='store_true', help='Eval only')
 parser.add_argument('--prepare_type',   type=str,   default="cohorts", help='Type of prepare')
 parser.add_argument('--prepare',        type=bool,   default=False, help='Prepare')
+parser.add_argument('--get_embedding',  type=bool,   default=False, help='Get embedding')
+parser.add_argument('--embedding_fn',  type=str,   default='embeddings.npy', help='Embedding file name')
 
 ## Distributed and mixed precision training
 parser.add_argument('--port',           type=str,   default="8888", help='Port for distributed training, input as text')
@@ -178,6 +181,14 @@ def main_worker(gpu, ngpus_per_node, args):
 
     for ii in range(1,it):
         trainer.__scheduler__.step()
+
+    # Get embedding for model scoring.
+    if args.get_embedding:
+        trainer.get_embedding(
+                            filename=args.embedding_fn,
+                            from_path=args.to_embed_path,
+                            save_path='.')
+        sys.exit(1)
     
     ## Prepare cohorts.
     if args.prepare is True:
